@@ -1,0 +1,88 @@
+<!-- AddressItem.vue -->
+<template>
+  <li class="address-item">
+    <div class="address-info">
+      <div class="address-text">{{ address.text }}</div>
+      <div class="address-tag">{{ address.tag ? `标记: ${address.tag}` : '' }}</div>
+    </div>
+    
+    <select 
+      :value="address.tag || '未标记'"
+      class="tag-select"
+      @change="handleTagChange"
+    >
+      <option 
+        v-for="option in tagOptions" 
+        :key="option" 
+        :value="option === '未标记' ? '' : option"
+      >
+        {{ option }}
+      </option>
+    </select>
+    
+    <button class="delete-btn" @click="handleDelete">删除</button>
+  </li>
+</template>
+
+<script>
+export default {
+  name: 'AddressItem',
+  props: {
+    address: {
+      type: Object,
+      required: true
+    },
+    tagOptions: {
+      type: Array,
+      required: true
+    }
+  },
+  methods: {
+    handleTagChange(event) {
+      this.$emit('update:tag', event.target.value)
+    },
+    
+    handleDelete() {
+      this.$emit('delete')
+    }
+  }
+}
+</script>
+
+<style scoped>
+.address-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+.address-info {
+  flex: 1;
+}
+.address-text {
+  font-weight: 500;
+  color: #333;
+}
+.address-tag {
+  font-size: 14px;
+  color: #6c757d;
+  margin-top: 4px;
+}
+.tag-select {
+  margin-right: 10px;
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+.delete-btn {
+  background-color: #dc3545;
+  padding: 6px 10px;
+}
+.delete-btn:hover {
+  background-color: #c82333;
+}
+</style>

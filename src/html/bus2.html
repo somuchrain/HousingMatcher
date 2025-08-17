@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <meta name="keywords" content="天地图"/>
+    <title>天地图－地图API－范例－公交搜索</title>
+    <script type="text/javascript" src="https://api.tianditu.gov.cn/api?v=4.0&tk=076dc2833037113c163fe2079b4c4b2a"></script>
+    <script>
+        var map;			//地图对象
+        var zoom = 12;		//地图级别
+        var transitRoute;	//公交搜索对象
+        var obj;			//公交搜索结果
+        var startLngLat;	//起点经纬度
+        var endLngLat;		//终点经纬度
+        var startTool;		//起点标注工具
+        var endTool;		//终点标注工具
+        var startIcon = "http://lbs.tianditu.gov.cn/images/bus/start.png";	//起点图标
+        var endIcon = "http://lbs.tianditu.gov.cn/images/bus/end.png";		//终点图标
+        var map_bus = "http://lbs.tianditu.gov.cn/images/bus/map_bus.png";
+        var map_metro = "http://lbs.tianditu.gov.cn/images/bus/map_metro.png";
+        function onLoad() {
+            //初始化地图对象
+            map = new T.Map("mapDiv");
+            //设置显示地图的中心点和级别
+            map.centerAndZoom(new T.LngLat(116.40969, 39.89945), zoom);
+
+            //鼠标标起点
+            startTool = new T.MarkTool(map, {
+                icon: new T.Icon({
+                    iconUrl: startIcon,
+                    iconSize: new T.Point(44, 34),
+                    iconAnchor: new T.Point(12, 31)
+                }), follow: true
+            });
+            startTool.on("mouseup", mouseUpStartMaker);
+            endTool = new T.MarkTool(map, {
+                icon: new T.Icon({
+                    iconUrl: endIcon,
+                    iconSize: new T.Point(44, 34),
+                    iconAnchor: new T.Point(12, 31)
+                }), follow: true
+            });
+            endTool.on("mouseup", mouseUpEndMaker);
+
+
+            var config = {
+                policy: 1,	//公交导航的策略参数
+                onSearchComplete: busSearchResult	//检索完成后的回调函数
+            };
+            //创建公交搜索对象
+            transitRoute = new T.TransitRoute(map, config);
+        }
+
+        //公交搜索
+        function searchBus() {
+            //清空显示列表
+            document.getElementById("resultDiv").innerHTML = "";
+            //清空地图
+            map.clearOverLays();
+
+            //起点经纬度
+            var startVal = document.getElementById("start").value.split(",");
+            startLngLat = new T.LngLat(startVal[0], startVal[1]);
+            //终点经纬度
+            var endVal = document.getElementById("end").value.split(",");
+            endLngLat = new T.LngLat(endVal[0], endVal[1]);
+
+            //设置公交策略
+            transitRoute.setPolicy(getRadioValue());
+            //公交搜索
+            transitRoute.search(startLngLat, endLngLat);
+        }
+
+        //显示公交搜索结果
+        function busSearchResult(result) {
+
+            if (transitRoute.getStatus() == 0) {
+                //添加起始点
+                createStartMarker();
+
+                obj = result;
+                var resultList = document.createElement("div");
+                //获取方案个数
+                var plans = result.getNumPlans();
+                for (var i = 0; i < plans; i++) {
+                    //获得单条公交结果对象
+                    var plan = result.getPlan(i);
+
+                    //显示单个方案面板
+                    var div = document.createElement("div");
+                    div.style.cssText = "font-size:12px; cursor:pointer; border:1px solid #999999;";
+                    //闭包
+                    (function (i) {
+                        div.onclick = function () {
+                            //清空地图
+                            map.clearOverLays();
+                            //添加起始点
+                            createStartMarker();
+                            //显示线路
+                            createSegments(obj.getPlan(i));
+                        };
+                    })(i);
+
+                    //显示方案内容
+                    var describeStr = "<strong>方案" + (i + 1) + "：" + plan.getLineName().join("→") + "，总时间：" + plan.getDuration() + "分，总距离：" + Math.round(plan.getDistance()) + "米</strong>";
+                    describeStr += "<div><img src='" + startIcon + "'/>" + document.getElementById("start").value + "</div>";
+
+                    //显示每个方案的详细信息
+                    var segmentNum = plan.getNumSegments();
+                    for (var m = 0; m < segmentNum; m++) {
+                        var line = plan.getDetails(m);
+                        var segmentLine = line.getSegmentLine()[0];
+
+                        //经过的公交或地铁的站数
+                        var stationCount = (segmentLine.segmentStationCount != "") ? "，经过" + segmentLine.segmentStationCount + "站" : "";
+
+                        //线路类型1，步行；2，公交；3，地铁；4， 地铁站内换乘
+                        if (line.getSegmentType() == 1) {
+                            describeStr += "步行约" + segmentLine.segmentDistance + "米，到达" + line.getStationEnd().name + "，";
+                        }
+                        else if (line.getSegmentType() == 2) {
+                            describeStr += "乘坐" + segmentLine.direction + stationCount + "，到达" + line.getStationEnd().name + "，";
+                        }
+                        else if (line.getSegmentType() == 3) {
+                            describeStr += "乘坐" + segmentLine.direction + stationCount + "，到达" + line.getStationEnd().name + "，";
+                        }
+                        else if (line.getSegmentType() == 4) {
+                            describeStr += "站内换乘，";
+                        }
+                    }
+                    //去掉最后的逗号
+                    describeStr = describeStr.substring(0, describeStr.length - 1);
+                    describeStr += "<div><img src='" + endIcon + "'/>" + document.getElementById("end").value + "</div>";
+                    div.innerHTML = describeStr;
+                    resultList.appendChild(div);
+
+                    //在地图上默认显示方案一的线路
+                    if (i == 0) {
+                        createSegments(result.getPlan(0));
+                    }
+                }
+                //显示公交搜索结果
+                document.getElementById("resultDiv").appendChild(resultList);
+            } else {
+            	alert(errorCodeMsg(transitRoute.getStatus()));
+            }
+        }
+
+        //显示公交线路
+        function createSegments(plan, planNum) {
+            var segmentNum = plan.getNumSegments();
+            for (var m = 0; m < segmentNum; m++) {
+                var line = plan.getDetails(m);
+                var segmentLine = line.getSegmentLine()[0];
+                //显示线路
+                createRoute(segmentLine.linePoint, line.getSegmentType(), line.getStationStart().lonlat, line.getStationEnd().lonlat);
+                //显示换乘图标
+                createMarker(line.getStationStart().lonlat, line.getStationEnd().lonlat, line.getSegmentType());
+            }
+        }
+
+        //显示公交换乘图标,lnglatStartStr表示该线路的起始点，lnglatEndStr表示该线路的终点，type表示线路类型
+        function createMarker(lnglatStartStr, lnglatEndStr, type) {
+            var icon1;
+            if (type == 2)	//公交
+            {
+                //公交标注
+                icon1 = new T.Icon({
+                    iconUrl: map_bus,
+                    iconSize: new T.Point(23, 23),
+                    iconAnchor: new T.Point(12, 12)
+                })
+            }
+            else if (type == 3)	//地铁
+            {
+                //地铁标注
+                //   var icon = new TIcon(map_metro, new TSize(23, 23), {anchor: new TPixel(12, 12)});
+                icon1 = new T.Icon({
+                    iconUrl: map_metro,
+                    iconSize: new T.Point(23, 23),
+                    iconAnchor: new T.Point(12, 12)
+                })
+            }
+            else	//地铁站内换乘
+            {
+                //地铁标注
+                // var icon = new TIcon(map_metro, new TSize(23, 23), {anchor: new TPixel(12, 12)});
+                icon1 = new T.Icon({
+                    iconUrl: map_metro,
+                    iconSize: new T.Point(23, 23),
+                    iconAnchor: new T.Point(12, 12)
+                })
+
+            }
+
+            if (type != 1) {
+                var lnglatStartArr = lnglatStartStr.split(",");
+                var lnglatStart = new T.LngLat(lnglatStartArr[0], lnglatStartArr[1]);
+                var lnglatEndArr = lnglatEndStr.split(",");
+                var lnglatEnd = new T.LngLat(lnglatEndArr[0], lnglatEndArr[1]);
+                var startMarker = new T.Marker(lnglatStart, {icon: icon1});
+                map.addOverLay(startMarker);
+                var endMarker = new T.Marker(lnglatEnd, {icon: icon1});
+                map.addOverLay(endMarker);
+            }
+        }
+
+        //公交线路，pointsStr表示经纬度字符串，type表示线路类型1，步行；2，公交；3，地铁；4， 地铁站内换乘，lnglat表示显示公交或地铁图标的经纬度
+        function createRoute(pointsStr, type, lnglatStartStr, lnglatEndStr) {
+
+            //去掉经纬度字符串最后一个分号，并存储在一个数据中。
+            var points = pointsStr.substring(0, pointsStr.length - 1).split(";");
+            //存储经纬度的数组
+            var lnglatArr = [];
+            for (var i = 0; i < points.length; i++) {
+                var lnglat = points[i].split(",");
+                lnglatArr.push(new T.LngLat(lnglat[0], lnglat[1]));
+            }
+
+            //步行
+            if (type == 1) {
+                var lineColor = "#2E9531";	//线的颜色
+                var lineStyle = "dashed";	//线的样式
+            }
+            else if (type == 2)	//公交
+            {
+                var lineColor = "#2C64A7";	//线的颜色
+                var lineStyle = "solid";	//线的样式
+            }
+            else if (type == 3)	//地铁
+            {
+                var lineColor = "#2C64A7";	//线的颜色
+                var lineStyle = "solid";	//线的样式
+            }
+            else	//地铁站内换乘
+            {
+                var lineColor = "#2E9531";	//线的颜色
+                var lineStyle = "dashed";	//线的样式
+            }
+
+            //创建线对象
+            var line = new T.Polyline(lnglatArr, {
+                color: lineColor,
+                weight: 4,
+                opacity: 1,
+                lineStyle: lineStyle
+            });
+            //向地图上添加线
+            map.addOverLay(line);
+        }
+
+        //添加起始点
+        function createStartMarker() {
+            //向地图上添加起点
+            var icon = new T.Icon({
+                iconUrl: startIcon,
+                iconSize: new T.Point(44, 34),
+                iconAnchor: new T.Point(12, 31)
+            })
+            var startMarker = new T.Marker(startLngLat, {icon: icon});
+            map.addOverLay(startMarker);
+            //向地图上添加终点
+            var icon = new T.Icon({
+                iconUrl: endIcon,
+                iconSize: new T.Point(44, 34),
+                iconAnchor: new T.Point(12, 31)
+            })
+            var endMarker = new T.Marker(endLngLat, {icon: icon});
+            map.addOverLay(endMarker);
+        }
+
+        function mouseUpStartMaker(e) {
+            startLngLat = e.currentLnglat;
+            document.getElementById("start").value = e.currentLnglat.getLng() + "," + e.currentLnglat.getLat();
+        }
+
+        function mouseUpEndMaker(e) {
+            startLngLat = e.currentLnglat;
+            document.getElementById("end").value = e.currentLnglat.getLng() + "," + e.currentLnglat.getLat();
+        }
+
+        //获得公交策略
+        function getRadioValue() {
+            var obj = document.getElementsByName("planType");
+            for (var i = 0; i < obj.length; i++) {
+                if (obj[i].checked) {
+                    return obj[i].value;
+                }
+            }
+        }
+        
+        function errorCodeMsg(code) {
+        	switch (code) {
+	    		case 1:
+	    			return '找不到起点';
+	    		case 2:
+	    			return '找不到终点';
+	    		case 3:
+	    			return '规划不出线路';
+	    		case 4:
+	    			return '起终点距离200米以内，不返回线路';
+	    		case 5:
+	    			return '起终点距离500米内，返回线路';
+	    		case 6:
+	    			return '输入参数错误';
+	    		default:
+	    			return '';
+    		}
+        }
+    </script>
+    <style type="text/css">body,html{width:100%;height:100%;margin:0;font-family:"Microsoft YaHei"}#mapDiv{width:100%;height:400px}input,b,p{margin-left:5px;font-size:14px}</style>
+</head>
+<body onLoad="onLoad()">
+<div id="mapDiv" ></div>
+<div >
+    <p>本示例演示如何进行公交搜索。</p>
+    <!-- 查询面板 -->
+    <!--<div style="font-size:13px; border:1px solid #999999; line-height:27px; padding-left:7px">-->
+        <input type="radio" name="planType" value="1" checked="checked"/>较快捷
+        <input type="radio" name="planType" value="2"/>少换乘
+        <input type="radio" name="planType" value="4"/>少步行
+        <input type="radio" name="planType" value="8"/>不坐地铁
+        <br/>
+        <!-- 116.34126,39.94978 116.415928,39.85608-->
+        起点：<input type="text" id="start" value="116.33297,39.99932"/>
+        <input type="button" value="起点" onClick="startTool.clear();startTool.open()"/>
+        <br/>
+        <!-- 116.43739,39.91477 116.329903,40.069522-->
+        终点：<input type="text" id="end" value="116.36181,39.86875"/>
+        <input type="button" value="终点" onClick="endTool.clear();endTool.open()"/>
+
+        <input type="button" onClick="searchBus()" value="公交搜索"/>
+    <!--</div>-->
+    <br/>
+    <!-- 结果面板 -->
+    <div id="resultDiv" ></div>
+</div>
+</body>
+</html>

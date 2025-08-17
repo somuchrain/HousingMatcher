@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <title>天地图－地图API－范例－测距工具</title>
+    <script type="text/javascript" src="http://api.tianditu.gov.cn/api?v=4.0&tk=076dc2833037113c163fe2079b4c4b2a"></script>
+    <style type="text/css">body,html{width:100%;height:100%;margin:0;font-family:"Microsoft YaHei"}#mapDiv{width:100%;height:400px}input,b,p{margin-left:5px;font-size:14px}</style>
+    <script>
+        var map, zoom = 12, lineTool
+        function onLoad() {
+            //初始化地图对象
+            map = new T.Map("mapDiv");
+            //设置显示地图的中心点和级别
+            map.centerAndZoom(new T.LngLat(116.40969, 39.94940), zoom);
+            //允许鼠标双击放大地图
+            map.enableScrollWheelZoom();
+            var config = {
+                showLabel: true
+
+            };
+            //创建标注工具对象
+            lineTool = new T.PolylineTool(map, config);
+        }
+    </script>
+</head>
+<body onLoad="onLoad()">
+<div id="mapDiv"></div>
+<p>本示例演示如何在地图上测距。</p>
+<div>
+    <input type="button" value="开启" onClick="lineTool.open();"/>
+    <input type="button" value="关闭" onClick="lineTool.close();"/>
+</div>
+</body>
+</html>
